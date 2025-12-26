@@ -9,3 +9,7 @@ timers in the browser and save them for later.
     - Web framework that serves the page and Jinja2 templates.
 - Alpine.js
     - Adds interactivity for the timers and the ability to save timers in the browser.
+
+# Screenshots
+
+![Screenshot of the Pomodoro Timer application](./images/readme_screenshot.PNG)
