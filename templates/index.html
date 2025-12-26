@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pomodoro Timer</title>
+    <!-- Load Alpine.js from static -->
+    <script defer src="{{ url_for('static', path='js/alpine.min.js') }}"></script>
+    <!-- Load fonts from static -->
+    <link rel="stylesheet" href="{{ url_for('static', path='fonts/dm-sans.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='fonts/clash-display.css') }}">
+    <!-- Load Tailwind CSS from static -->
+    <link rel="stylesheet" href="{{ url_for('static', path='css/tailwind.min.css') }}">
+
+    <style>
+        * {
+            font-family: 'DM Sans', sans-serif;
+        }
+
+        .font-display {
+            font-family: 'Clash Display', sans-serif;
+        }
+
+        @keyframes float {
+            0%, 100% {
+                transform: translateY(0px);
+            }
+            50% {
+                transform: translateY(-20px);
+            }
+        }
+
+        @keyframes pulse-ring {
+            0% {
+                transform: scale(0.95);
+                opacity: 1;
+            }
+            100% {
+                transform: scale(1.05);
+                opacity: 0;
+            }
+        }
+
+        .animate-float {
+            animation: float 6s ease-in-out infinite;
+        }
+
+        .timer-glow {
+            box-shadow: 0 0 60px rgba(59, 130, 246, 0.3);
+        }
+
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .glass {
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .card-hover {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .card-hover:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+        }
+
+        .progress-ring {
+            transform: rotate(-90deg);
+            transform-origin: center;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+    </style>
+</head>
+
+<body class="gradient-bg min-h-screen text-white overflow-x-hidden">
+<div x-data="pomodoroApp()" x-init="init()" class="container mx-auto px-4 py-8 max-w-7xl">
+
+    <!-- Header -->
+    <div class="text-center mb-12 animate-float">
+        <h1 class="font-display text-6xl md:text-7xl font-bold mb-3 bg-clip-text text-transparent bg-gradient-to-r from-white to-purple-200">
+            Focus Timer
+        </h1>
+        <p class="text-purple-200 text-lg">Stay productive, one session at a time</p>
+    </div>
+
+    <div class="grid lg:grid-cols-3 gap-8">
+
+        <!-- Main Timer Section -->
+        <div class="lg:col-span-2">
+            <div class="glass rounded-3xl p-8 md:p-12 card-hover">
+
+                <!-- Timer Display -->
+                <div class="text-center mb-8">
+                    <template x-if="currentTimer">
+                        <div>
+                            <div class="inline-flex items-center gap-2 bg-white/10 px-4 py-2 rounded-full mb-6">
+                                <div class="w-2 h-2 rounded-full bg-green-400 animate-pulse"></div>
+                                <span x-text="currentTimer.name" class="text-sm font-medium"></span>
+                            </div>
+
+                            <!-- Circular Progress -->
+                            <div class="relative inline-flex items-center justify-center mb-8">
+                                <svg class="w-72 h-72" viewBox="0 0 200 200">
+                                    <!-- Background circle -->
+                                    <circle
+                                            cx="100"
+                                            cy="100"
+                                            r="90"
+                                            fill="none"
+                                            stroke="rgba(255, 255, 255, 0.1)"
+                                            stroke-width="8"
+                                    />
+                                    <!-- Progress circle -->
+                                    <circle
+                                            class="progress-ring transition-all duration-1000"
+                                            cx="100"
+                                            cy="100"
+                                            r="90"
+                                            fill="none"
+                                            stroke="url(#gradient)"
+                                            stroke-width="8"
+                                            stroke-linecap="round"
+                                            :stroke-dasharray="565.48"
+                                            :stroke-dashoffset="565.48 * (1 - progress)"
+                                    />
+                                    <defs>
+                                        <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                            <stop offset="0%" style="stop-color:#60a5fa;stop-opacity:1"/>
+                                            <stop offset="100%" style="stop-color:#a78bfa;stop-opacity:1"/>
+                                        </linearGradient>
+                                    </defs>
+                                </svg>
+                                <div class="absolute inset-0 flex flex-col items-center justify-center">
+                                    <div class="font-display text-6xl md:text-7xl font-bold timer-glow"
+                                         x-text="formattedTime"></div>
+                                    <div class="text-purple-200 text-sm mt-2">minutes remaining</div>
+                                </div>
+                            </div>
+
+                            <!-- Controls -->
+                            <div class="flex items-center justify-center gap-4">
+                                <button
+                                        @click="reset()"
+                                        class="px-6 py-3 rounded-xl bg-white/10 hover:bg-white/20 transition-all duration-300 font-medium"
+                                >
+                                    Reset
+                                </button>
+                                <button
+                                        @click="toggleTimer()"
+                                        class="px-10 py-4 rounded-xl bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 transition-all duration-300 font-bold text-lg shadow-xl hover:shadow-2xl transform hover:scale-105"
+                                >
+                                    <span x-text="isRunning ? 'Pause' : 'Start'"></span>
+                                </button>
+                                <button
+                                        @click="skip()"
+                                        class="px-6 py-3 rounded-xl bg-white/10 hover:bg-white/20 transition-all duration-300 font-medium"
+                                >
+                                    Skip
+                                </button>
+                            </div>
+                        </div>
+                    </template>
+
+                    <template x-if="!currentTimer">
+                        <div class="py-20">
+                            <div class="text-6xl mb-4">⏱️</div>
+                            <p class="text-2xl text-purple-200 mb-2">No timer selected</p>
+                            <p class="text-purple-300">Create or select a timer to get started</p>
+                        </div>
+                    </template>
+                </div>
+
+                <!-- Stats -->
+                <template x-if="currentTimer">
+                    <div class="grid grid-cols-3 gap-4 mt-8 pt-8 border-t border-white/10">
+                        <div class="text-center">
+                            <div class="text-3xl font-bold text-blue-300" x-text="currentTimer.sessionsCompleted"></div>
+                            <div class="text-sm text-purple-200 mt-1">Sessions</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-3xl font-bold text-purple-300" x-text="currentTimer.workDuration"></div>
+                            <div class="text-sm text-purple-200 mt-1">Work Min</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-3xl font-bold text-pink-300" x-text="currentTimer.breakDuration"></div>
+                            <div class="text-sm text-purple-200 mt-1">Break Min</div>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+
+        <!-- Timers Sidebar -->
+        <div class="lg:col-span-1">
+            <div class="glass rounded-3xl p-6 h-full">
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="font-display text-2xl font-bold">Your Timers</h2>
+                    <button
+                            @click="showCreateModal = true"
+                            class="w-10 h-10 rounded-xl bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 flex items-center justify-center transition-all duration-300 transform hover:scale-110"
+                    >
+                        <span class="text-2xl">+</span>
+                    </button>
+                </div>
+
+                <div class="space-y-3 max-h-[600px] overflow-y-auto custom-scrollbar pr-2">
+                    <template x-for="timer in timers" :key="timer.id">
+                        <div
+                                @click="selectTimer(timer)"
+                                :class="currentTimer?.id === timer.id ? 'bg-gradient-to-r from-blue-500/30 to-purple-500/30 border-blue-400' : 'bg-white/5 border-white/10 hover:bg-white/10'"
+                                class="p-4 rounded-xl border cursor-pointer transition-all duration-300 card-hover"
+                        >
+                            <div class="flex items-start justify-between mb-2">
+                                <h3 class="font-semibold" x-text="timer.name"></h3>
+                                <button
+                                        @click.stop="deleteTimer(timer.id)"
+                                        class="text-red-400 hover:text-red-300 text-sm"
+                                >
+                                    ×
+                                </button>
+                            </div>
+                            <div class="flex items-center gap-4 text-sm text-purple-200">
+                                <span>🎯 <span x-text="timer.workDuration"></span>m</span>
+                                <span>☕ <span x-text="timer.breakDuration"></span>m</span>
+                                <span>✓ <span x-text="timer.sessionsCompleted"></span></span>
+                            </div>
+                        </div>
+                    </template>
+
+                    <template x-if="timers.length === 0">
+                        <div class="text-center py-12 text-purple-200">
+                            <div class="text-4xl mb-3">📝</div>
+                            <p>No timers yet</p>
+                            <p class="text-sm mt-1">Create your first timer to begin</p>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Timer Modal -->
+    <div
+            x-show="showCreateModal"
+            x-transition
+            class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50"
+            @click.self="showCreateModal = false"
+    >
+        <div class="glass rounded-3xl p-8 max-w-md w-full" @click.stop>
+            <h2 class="font-display text-3xl font-bold mb-6">Create Timer</h2>
+
+            <form @submit.prevent="createTimer()">
+                <div class="space-y-5">
+                    <div>
+                        <label class="block text-sm font-medium mb-2 text-purple-200">Timer Name</label>
+                        <input
+                                x-model="newTimer.name"
+                                type="text"
+                                placeholder="e.g., Deep Work"
+                                class="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/20 focus:border-blue-400 focus:outline-none transition-colors placeholder-purple-300"
+                                required
+                        >
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium mb-2 text-purple-200">Work Duration (minutes)</label>
+                        <input
+                                x-model.number="newTimer.workDuration"
+                                type="number"
+                                min="1"
+                                max="120"
+                                placeholder="25"
+                                class="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/20 focus:border-blue-400 focus:outline-none transition-colors placeholder-purple-300"
+                                required
+                        >
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium mb-2 text-purple-200">Break Duration (minutes)</label>
+                        <input
+                                x-model.number="newTimer.breakDuration"
+                                type="number"
+                                min="1"
+                                max="60"
+                                placeholder="5"
+                                class="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/20 focus:border-blue-400 focus:outline-none transition-colors placeholder-purple-300"
+                                required
+                        >
+                    </div>
+                </div>
+
+                <div class="flex gap-3 mt-8">
+                    <button
+                            type="button"
+                            @click="showCreateModal = false"
+                            class="flex-1 px-6 py-3 rounded-xl bg-white/10 hover:bg-white/20 transition-all duration-300 font-medium"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                            type="submit"
+                            class="flex-1 px-6 py-3 rounded-xl bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 transition-all duration-300 font-bold"
+                    >
+                        Create
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    function pomodoroApp() {
+        return {
+            timers: [],
+            currentTimer: null,
+            timeRemaining: 0,
+            isRunning: false,
+            isWorkSession: true,
+            interval: null,
+            showCreateModal: false,
+            newTimer: {
+                name: '',
+                workDuration: 25,
+                breakDuration: 5
+            },
+
+            init() {
+                this.loadTimers();
+                if (this.timers.length > 0) {
+                    this.selectTimer(this.timers[0]);
+                }
+            },
+
+            loadTimers() {
+                const saved = localStorage.getItem('pomodoroTimers');
+                if (saved) {
+                    this.timers = JSON.parse(saved);
+                }
+            },
+
+            saveTimers() {
+                localStorage.setItem('pomodoroTimers', JSON.stringify(this.timers));
+            },
+
+            createTimer() {
+                const timer = {
+                    id: Date.now(),
+                    name: this.newTimer.name,
+                    workDuration: this.newTimer.workDuration,
+                    breakDuration: this.newTimer.breakDuration,
+                    sessionsCompleted: 0
+                };
+
+                this.timers.push(timer);
+                this.saveTimers();
+                this.showCreateModal = false;
+                this.newTimer = {name: '', workDuration: 25, breakDuration: 5};
+
+                if (!this.currentTimer) {
+                    this.selectTimer(timer);
+                }
+            },
+
+            selectTimer(timer) {
+                this.currentTimer = timer;
+                this.isWorkSession = true;
+                this.timeRemaining = timer.workDuration * 60;
+                this.isRunning = false;
+                if (this.interval) {
+                    clearInterval(this.interval);
+                }
+            },
+
+            deleteTimer(id) {
+                if (confirm('Delete this timer?')) {
+                    this.timers = this.timers.filter(t => t.id !== id);
+                    this.saveTimers();
+
+                    if (this.currentTimer?.id === id) {
+                        this.currentTimer = this.timers.length > 0 ? this.timers[0] : null;
+                        if (this.currentTimer) {
+                            this.selectTimer(this.currentTimer);
+                        }
+                    }
+                }
+            },
+
+            toggleTimer() {
+                this.isRunning = !this.isRunning;
+
+                if (this.isRunning) {
+                    this.interval = setInterval(() => {
+                        if (this.timeRemaining > 0) {
+                            this.timeRemaining--;
+                        } else {
+                            this.completeSession();
+                        }
+                    }, 1000);
+                } else {
+                    clearInterval(this.interval);
+                }
+            },
+
+            reset() {
+                this.isRunning = false;
+                clearInterval(this.interval);
+                this.timeRemaining = this.isWorkSession ?
+                    this.currentTimer.workDuration * 60 :
+                    this.currentTimer.breakDuration * 60;
+            },
+
+            skip() {
+                this.completeSession();
+            },
+
+            completeSession() {
+                clearInterval(this.interval);
+                this.isRunning = false;
+
+                if (this.isWorkSession) {
+                    // Work session completed, start break
+                    const index = this.timers.findIndex(t => t.id === this.currentTimer.id);
+                    if (index !== -1) {
+                        this.timers[index].sessionsCompleted++;
+                        this.currentTimer.sessionsCompleted++;
+                        this.saveTimers();
+                    }
+                    this.isWorkSession = false;
+                    this.timeRemaining = this.currentTimer.breakDuration * 60;
+
+                    // Play notification sound or show notification
+                    this.notify('Work session complete! Time for a break.');
+                } else {
+                    // Break completed, start work
+                    this.isWorkSession = true;
+                    this.timeRemaining = this.currentTimer.workDuration * 60;
+
+                    this.notify('Break complete! Ready for another session?');
+                }
+            },
+
+            notify(message) {
+                if ('Notification' in window && Notification.permission === 'granted') {
+                    new Notification('Focus Timer', {body: message});
+                } else if ('Notification' in window && Notification.permission !== 'denied') {
+                    Notification.requestPermission().then(permission => {
+                        if (permission === 'granted') {
+                            new Notification('Focus Timer', {body: message});
+                        }
+                    });
+                }
+            },
+
+            get formattedTime() {
+                const minutes = Math.floor(this.timeRemaining / 60);
+                const seconds = this.timeRemaining % 60;
+                return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+            },
+
+            get progress() {
+                const totalTime = this.isWorkSession ?
+                    this.currentTimer.workDuration * 60 :
+                    this.currentTimer.breakDuration * 60;
+                return 1 - (this.timeRemaining / totalTime);
+            }
+        }
+    }
+</script>
+</body>
+</html>

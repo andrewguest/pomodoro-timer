@@ -1,0 +1,17 @@
+{
+  "name": "pomodoro-timer",
+  "version": "1.0.0",
+  "description": "This is a project that I created to get more practice with the Alpine.js library. It allows you to create pomodoro\r timers in the browser and save them for later.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.1.18",
+    "tailwindcss": "^4.1.18"
+  }
+}
