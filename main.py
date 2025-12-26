@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 # Logging setup
 with open("logging_conf.json", "r") as f:
@@ -23,6 +24,10 @@ app = FastAPI(
     description="Web-based pomodoro timers.",
     version="0.0.1",
 )
+
+# This needs to be BEFORE the static files are mounted to allow for HTTPS redirection to work
+#   url_for() in the HTML templates needs to know that the request can through HTTPS
+app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")  # ty:ignore[invalid-argument-type]
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Middleware
