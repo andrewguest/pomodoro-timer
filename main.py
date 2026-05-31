@@ -1,26 +1,45 @@
 import ipaddress
-import logging.config
+import logging
 import os
 import time
+from contextlib import asynccontextmanager
 
-import axiom_py
-from axiom_py.logging import AxiomHandler
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from opentelemetry import _logs
+from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler  
+from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
+from opentelemetry.sdk.resources import SERVICE_NAME, Resource
+from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 # Logging setup
 load_dotenv()
-client = axiom_py.Client(os.getenv("AXIOM_TOKEN"))
-handler = AxiomHandler(client, "pomodoro-timer")
-logging.getLogger().addHandler(handler)
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+resource = Resource.create({SERVICE_NAME: os.getenv('POSTHOG_SERVICE_NAME', "unknown")})
+logger_provider = LoggerProvider(resource=resource)
+_logs.set_logger_provider(logger_provider)
 
+otlp_exporter = OTLPLogExporter(  
+    endpoint="https://us.i.posthog.com/i/v1/logs",  
+    headers={"Authorization": f"Bearer {os.getenv('POSTHOG_TOKEN', None)}"}  
+)
+logger_provider.add_log_record_processor(
+    BatchLogRecordProcessor(otlp_exporter)
+)
+logging.basicConfig(level=logging.INFO)
+logging.getLogger().addHandler(LoggingHandler())
+logger = logging.getLogger("pomodoro-timer")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    yield
+    # Shutdown: flush pending logs
+    logger_provider.shutdown()
 
 # FastAPI setup
 templates = Jinja2Templates(directory="templates")
@@ -28,6 +47,7 @@ app = FastAPI(
     title="Pomodoro timer",
     description="Web-based pomodoro timers.",
     version="0.0.1",
+    lifespan=lifespan
 )
 
 # This needs to be BEFORE the static files are mounted to allow for HTTPS redirection to work
