@@ -11,10 +11,10 @@ from fastapi.responses import HTMLResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from opentelemetry import _logs
+from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter
 from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler  
 from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
 from opentelemetry.sdk.resources import SERVICE_NAME, Resource
-from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 # Logging setup
@@ -22,7 +22,6 @@ load_dotenv()
 resource = Resource.create({SERVICE_NAME: os.getenv('POSTHOG_SERVICE_NAME', "unknown")})
 logger_provider = LoggerProvider(resource=resource)
 _logs.set_logger_provider(logger_provider)
-
 otlp_exporter = OTLPLogExporter(  
     endpoint="https://us.i.posthog.com/i/v1/logs",  
     headers={"Authorization": f"Bearer {os.getenv('POSTHOG_TOKEN', None)}"}  
